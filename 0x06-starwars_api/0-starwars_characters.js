@@ -1,25 +1,51 @@
-#!/usr/bin/node
-const request = require('request');
-const API_URL = 'https://swapi-api.hbtn.io/api';
+const axios = require('axios');
 
-if (process.argv.length > 2) {
-  request(`${API_URL}/films/${process.argv[2]}/`, (err, _, body) => {
-    if (err) {
-      console.log(err);
+const getMovieCharacters = async (movieId) => {
+  try {
+    // Fetch movie data from SWAPI
+    const movieResponse = await axios.get(`https://swapi.dev/api/films/${movieId}/`);
+    const movieData = movieResponse.data;
+
+    if (!movieData || movieData.detail === 'Not found') {
+      console.log(`Movie with ID ${movieId} not found.`);
+      return;
     }
-    const charactersURL = JSON.parse(body).characters;
-    const charactersName = charactersURL.map(
-      url => new Promise((resolve, reject) => {
-        request(url, (promiseErr, __, charactersReqBody) => {
-          if (promiseErr) {
-            reject(promiseErr);
-          }
-          resolve(JSON.parse(charactersReqBody).name);
-        });
-      }));
 
-    Promise.all(charactersName)
-      .then(names => console.log(names.join('\n')))
-      .catch(allErr => console.log(allErr));
-  });
-}
+    const charactersUrls = movieData.characters;
+
+    // Fetch character names from SWAPI
+    const characterNames = await Promise.all(
+      charactersUrls.map(async (characterUrl) => {
+        const characterResponse = await axios.get(characterUrl);
+        return characterResponse.data.name;
+      })
+    );
+
+    return characterNames;
+  } catch (error) {
+    console.error(`Error fetching data from SWAPI: ${error.message}`);
+  }
+};
+
+const main = async () => {
+  const args = process.argv.slice(2);
+
+  if (args.length !== 1 || isNaN(args[0])) {
+    console.log('Usage: node 0-starwars_characters.js <movie_id>');
+    process.exit(1);
+  }
+
+  const movieId = parseInt(args[0], 10);
+
+  const characterNames = await getMovieCharacters(movieId);
+
+  if (characterNames) {
+    console.log(`Characters in Star Wars Episode ${movieId}:`);
+    characterNames.forEach((characterName) => {
+      console.log(characterName);
+    });
+  }
+};
+
+main();
+
